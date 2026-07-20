@@ -168,21 +168,31 @@ void publishStatus(bool isOpen) {
 }
 
 // Sends this device's id + the pairing code entered during setup to the dashboard,
-// linking it to whichever owner account generated that code. Runs once; the dashboard
-// clears the pairing code after a successful claim, so retrying with a stale code
-// will just fail harmlessly (the device stays "unclaimed" and logs won't show up
-// under any owner, but WiFi/local sensing/buzzer keep working regardless).
+// linking it to whichever owner account generated that code. The dashboard clears
+// the pairing code after a successful claim, so retrying with a stale code just
+// fails harmlessly (the device stays "unclaimed" and logs won't show up under any
+// owner, but WiFi/local sensing/buzzer keep working regardless).
+//
+// Retries a few times: this is the very first HTTPS request the device makes right
+// after joining WiFi, and the first TLS connection immediately post-association can
+// fail (DNS/TLS stack not fully settled yet) even though the network is otherwise fine —
+// a transient failure here would otherwise silently leave the device unclaimed forever.
 void claimDeviceWithDashboard(const String& claimCode) {
   if (dashboardUrl.isEmpty() || claimCode.isEmpty()) return;
 
-  HTTPClient http;
-  beginDashboardRequest(http, "/api/devices/claim");
-  http.addHeader("Content-Type", "application/json");
-  String body = "{\"deviceId\":\"" + deviceId + "\",\"claimCode\":\"" + claimCode +
-    "\",\"token\":\"" + deviceToken + "\"}";
-  int code = http.POST(body);
-  Serial.println("Claim -> HTTP " + String(code));
-  http.end();
+  for (int attempt = 1; attempt <= 4; attempt++) {
+    HTTPClient http;
+    beginDashboardRequest(http, "/api/devices/claim");
+    http.addHeader("Content-Type", "application/json");
+    String body = "{\"deviceId\":\"" + deviceId + "\",\"claimCode\":\"" + claimCode +
+      "\",\"token\":\"" + deviceToken + "\"}";
+    int code = http.POST(body);
+    Serial.println("Claim attempt " + String(attempt) + " -> HTTP " + String(code));
+    http.end();
+
+    if (code > 0) return; // got a real HTTP response (success or not) — stop retrying either way
+    delay(1500);
+  }
 }
 
 // Runs the WiFiManager captive portal: device becomes its own WiFi AP ("SmartDoor-Setup"),
