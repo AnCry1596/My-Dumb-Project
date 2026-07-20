@@ -57,7 +57,7 @@ const unsigned long STATE_POLL_MS = 5000; // how often to ask the dashboard for 
 
 // ponytail: locked to the local dev server for testing — switch to your public https:// URL once hosted
 // const char* DEFAULT_DASHBOARD_URL = "http://192.168.79.2:3000";
-const char* DEFAULT_DASHBOARD_URL = "https://smartdoor.annnekkk.com/";
+const char* DEFAULT_DASHBOARD_URL = "https://smartdoor.annnekkk.com";
 
 Preferences prefs;
 String deviceId;          // stable per-chip id, generated once
