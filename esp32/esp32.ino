@@ -17,13 +17,16 @@
 // Set USE_LCD to 0 to test without the LCD wired up — status prints to Serial (115200 baud) instead.
 //
 // First-boot setup: device starts its own WiFi AP "SmartDoor-Setup" (no password).
-// Connect to it, a captive portal page opens automatically. Enter your home WiFi,
-// the dashboard URL, and the 6-digit pairing code shown on the dashboard's "Add
-// device" page. The device generates its own random auth token locally (no need
-// to type one in) and registers it with the dashboard during the pairing claim.
-// WiFiManager saves WiFi creds to flash; this sketch saves the rest to Preferences.
-// To re-run setup later, hold BOOT (GPIO0) during power-on for 3s, or clear WiFi
-// settings via WiFiManager's portal.
+// Connect to it, a captive portal page opens automatically. Enter your home WiFi
+// and the 6-digit pairing code shown on the dashboard's "Add device" page — that's
+// it, only two things to fill in. The dashboard URL always comes from
+// DEFAULT_DASHBOARD_URL below (edit it and reflash if you ever need a different
+// server; not exposed in the portal to keep setup simple and avoid typos).
+// The device generates its own random auth token locally (no need to type one in)
+// and registers it with the dashboard during the pairing claim. WiFiManager saves
+// WiFi creds to flash; this sketch saves the rest to Preferences. To re-run setup
+// later, hold BOOT (GPIO0) during power-on for 3s, or clear WiFi settings via
+// WiFiManager's portal.
 //
 // Armed state comes from the dashboard, polled every STATE_POLL_MS. While disarmed
 // (by manual toggle, one-off override, or recurring schedule), the door sensor still
@@ -53,7 +56,8 @@ const int SETUP_BUTTON_PIN = 0; // BOOT button on most ESP32 dev boards
 const unsigned long STATE_POLL_MS = 5000; // how often to ask the dashboard for armed/disarmed state
 
 // ponytail: locked to the local dev server for testing — switch to your public https:// URL once hosted
-const char* DEFAULT_DASHBOARD_URL = "http://192.168.79.2:3000";
+// const char* DEFAULT_DASHBOARD_URL = "http://192.168.79.2:3000";
+const char* DEFAULT_DASHBOARD_URL = "https://smartdoor.annnekkk.com/";
 
 Preferences prefs;
 String deviceId;          // stable per-chip id, generated once
@@ -174,15 +178,20 @@ void claimDeviceWithDashboard(const String& claimCode) {
 }
 
 // Runs the WiFiManager captive portal: device becomes its own WiFi AP ("SmartDoor-Setup"),
-// serves a config page with fields for dashboard URL and pairing code, alongside
-// WiFiManager's own WiFi SSID/password fields. Blocks until the user submits the
-// form and WiFi connects successfully (or times out and reboots to retry).
+// serves a config page with a pairing-code field alongside WiFiManager's own WiFi
+// SSID/password fields. Blocks until the user submits the form and WiFi connects
+// successfully (or times out and reboots to retry).
 void runSetupPortal() {
   WiFiManager wm;
 
-  WiFiManagerParameter p_dashboard("dashboard", "Dashboard URL (https://...)", dashboardUrl.c_str(), 128);
+  wm.setTitle("SmartDoor Setup");
+  wm.setCustomHeadElement(
+    "<style>body{text-align:center}</style>"
+    "<p>Connect this device to your home WiFi, then enter the 6-digit pairing "
+    "code shown on the SmartDoor dashboard's \"Add device\" page.</p>"
+  );
+
   WiFiManagerParameter p_claim("claim", "Pairing Code (from dashboard)", "", 8);
-  wm.addParameter(&p_dashboard);
   wm.addParameter(&p_claim);
 
   wm.setConfigPortalTimeout(300); // 5 min, then reboot and retry rather than hang forever
@@ -202,9 +211,8 @@ void runSetupPortal() {
     ESP.restart();
   }
 
-  dashboardUrl = String(p_dashboard.getValue());
+  dashboardUrl = DEFAULT_DASHBOARD_URL;
   String claimCode = String(p_claim.getValue());
-  while (dashboardUrl.endsWith("/")) dashboardUrl.remove(dashboardUrl.length() - 1);
 
   prefs.putString("dashboardUrl", dashboardUrl);
 

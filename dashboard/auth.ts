@@ -6,6 +6,12 @@ import { findUserByEmail } from "@/lib/mongodb";
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  // Self-hosted behind a reverse proxy (nginx/Caddy) — the app sees requests on an
+  // internal host/port, not the public domain, so NextAuth's default same-host
+  // check rejects them. trustHost tells it to trust X-Forwarded-Host instead.
+  // Safe here because the app isn't directly exposed to the internet — only via
+  // the proxy in front of it.
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
