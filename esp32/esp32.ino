@@ -64,6 +64,14 @@ String deviceId;          // stable per-chip id, generated once
 String dashboardUrl;      // e.g. https://your-dashboard.example.com  (no trailing slash)
 String deviceToken;       // random secret this device generates itself, registered with the dashboard at claim time
 
+// A trailing slash here would turn "url + /api/log" into a double slash, which
+// servers/proxies commonly 308-redirect — and HTTPClient doesn't handle that
+// redirect cleanly for POST bodies. Applied everywhere dashboardUrl gets set.
+String stripTrailingSlash(String url) {
+  while (url.endsWith("/")) url.remove(url.length() - 1);
+  return url;
+}
+
 String generateToken() {
   String t;
   for (int i = 0; i < 32; i++) t += "0123456789abcdef"[esp_random() % 16];
@@ -211,7 +219,7 @@ void runSetupPortal() {
     ESP.restart();
   }
 
-  dashboardUrl = DEFAULT_DASHBOARD_URL;
+  dashboardUrl = stripTrailingSlash(DEFAULT_DASHBOARD_URL);
   String claimCode = String(p_claim.getValue());
 
   prefs.putString("dashboardUrl", dashboardUrl);
@@ -262,7 +270,7 @@ void setup() {
     deviceToken = generateToken();
     prefs.putString("deviceToken", deviceToken);
   }
-  dashboardUrl = prefs.getString("dashboardUrl", DEFAULT_DASHBOARD_URL);
+  dashboardUrl = stripTrailingSlash(prefs.getString("dashboardUrl", DEFAULT_DASHBOARD_URL));
 
   espClient.setInsecure(); // ponytail: skips CA verification for the dashboard's HTTPS cert like most ESP32 demos; pin it if this goes past a hobby project
 
