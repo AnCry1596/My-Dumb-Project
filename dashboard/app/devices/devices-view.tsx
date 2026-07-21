@@ -12,6 +12,8 @@ export default function DevicesView() {
   const [newName, setNewName] = useState("");
   const [pendingCode, setPendingCode] = useState<string | null>(null);
   const [pendingDeviceObjectId, setPendingDeviceObjectId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [removing, setRemoving] = useState(false);
 
   async function load() {
     try {
@@ -57,6 +59,26 @@ export default function DevicesView() {
     load();
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function removeSelected() {
+    if (!confirm(`Remove ${selectedIds.size} device${selectedIds.size === 1 ? "" : "s"}? This can't be undone.`)) return;
+    setRemoving(true);
+    await Promise.all(
+      [...selectedIds].map((id) => fetch(`/api/devices/${id}`, { method: "DELETE" }))
+    );
+    setSelectedIds(new Set());
+    setRemoving(false);
+    load();
+  }
+
   return (
     <div className="flex flex-col flex-1 items-center bg-zinc-50 font-sans dark:bg-black">
       <main className="flex flex-1 w-full max-w-3xl flex-col py-12 px-6">
@@ -97,9 +119,25 @@ export default function DevicesView() {
           <p className="text-sm text-zinc-500">No devices yet.</p>
         )}
 
+        {selectedIds.size > 0 && (
+          <button
+            onClick={removeSelected}
+            disabled={removing}
+            className="mb-4 self-start rounded border border-red-300 px-3 py-1.5 text-xs font-medium text-red-600 disabled:opacity-50 dark:border-red-900 dark:text-red-400"
+          >
+            Remove {selectedIds.size} selected
+          </button>
+        )}
+
         <ul className="flex flex-col gap-2">
           {devices?.map((d) => (
-            <DeviceCard key={String(d._id)} device={d} onChanged={load} />
+            <DeviceCard
+              key={String(d._id)}
+              device={d}
+              onChanged={load}
+              selected={selectedIds.has(String(d._id))}
+              onToggleSelected={() => toggleSelected(String(d._id))}
+            />
           ))}
         </ul>
       </main>

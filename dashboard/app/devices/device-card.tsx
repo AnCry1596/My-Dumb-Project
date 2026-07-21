@@ -19,9 +19,13 @@ async function patchDevice(id: string, body: object) {
 export default function DeviceCard({
   device,
   onChanged,
+  selected,
+  onToggleSelected,
 }: {
   device: DeviceWithState;
   onChanged: () => void;
+  selected: boolean;
+  onToggleSelected: () => void;
 }) {
   const id = String(device._id);
   const [editingName, setEditingName] = useState<string | null>(null);
@@ -110,22 +114,31 @@ export default function DeviceCard({
           </div>
         ) : (
           <>
-            <div className="flex flex-col">
-              <span className="font-medium text-black dark:text-zinc-50">{device.name}</span>
-              <span className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-                {device.deviceId ? (
-                  <>
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${
-                        device.online ? "bg-green-500" : "bg-zinc-400"
-                      }`}
-                    />
-                    {device.deviceId} · {device.online ? "Online" : "Offline"}
-                  </>
-                ) : (
-                  "Waiting for device to pair..."
-                )}
-              </span>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={selected}
+                onChange={onToggleSelected}
+                aria-label={`Select ${device.name}`}
+                className="h-4 w-4"
+              />
+              <div className="flex flex-col">
+                <span className="font-medium text-black dark:text-zinc-50">{device.name}</span>
+                <span className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                  {device.deviceId ? (
+                    <>
+                      <span
+                        className={`inline-block h-1.5 w-1.5 rounded-full ${
+                          device.online ? "bg-green-500" : "bg-zinc-400"
+                        }`}
+                      />
+                      {device.deviceId} · {device.online ? "Online" : "Offline"}
+                    </>
+                  ) : (
+                    "Waiting for device to pair..."
+                  )}
+                </span>
+              </div>
             </div>
             <div className="flex gap-3">
               <button onClick={() => setEditingName(device.name)} className="text-sm underline">
