@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type SubmitEvent } from "react";
 import type { DeviceDoc } from "@/lib/mongodb";
 import DeviceCard from "./device-card";
 
@@ -26,25 +26,20 @@ export default function DevicesView() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional fetch-on-mount + poll, not state derived from props
     load();
     const id = setInterval(load, 3000); // ponytail: poll instead of websockets, catches pairing + schedule-driven state changes
     return () => clearInterval(id);
   }, []);
 
   // Once the device we're waiting on actually pairs (gets a deviceId), the
-  // pairing-code banner has served its purpose — hide it. Runs whenever a poll
-  // brings in fresh `devices`, instead of living inside the interval's `load`
-  // closure (which would keep seeing pendingDeviceObjectId as it was at mount).
-  useEffect(() => {
-    if (!pendingDeviceObjectId || !devices) return;
-    const paired = devices.find((d) => String(d._id) === pendingDeviceObjectId)?.deviceId;
-    if (paired) {
-      setPendingCode(null);
-      setPendingDeviceObjectId(null);
-    }
-  }, [devices, pendingDeviceObjectId]);
+  // pairing-code banner has served its purpose — hide it. Derived at render time
+  // from the latest `devices` poll rather than synced into state via an effect.
+  const stillPending =
+    pendingDeviceObjectId !== null &&
+    !devices?.find((d) => String(d._id) === pendingDeviceObjectId)?.deviceId;
 
-  async function handleAdd(e: React.FormEvent) {
+  async function handleAdd(e: SubmitEvent) {
     e.preventDefault();
     const res = await fetch("/api/devices", {
       method: "POST",
@@ -86,7 +81,7 @@ export default function DevicesView() {
           </button>
         </form>
 
-        {pendingCode && (
+        {pendingCode && stillPending && (
           <div className="mb-6 rounded-lg border border-blue-300 bg-blue-50 px-4 py-3 text-sm dark:border-blue-900 dark:bg-blue-950">
             Pairing code: <span className="font-mono text-lg font-bold">{pendingCode}</span>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
