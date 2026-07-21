@@ -4,7 +4,7 @@ import { useEffect, useState, type SubmitEvent } from "react";
 import type { DeviceDoc } from "@/lib/mongodb";
 import DeviceCard from "./device-card";
 
-type DeviceWithState = DeviceDoc & { currentlyArmed: boolean };
+type DeviceWithState = DeviceDoc & { currentlyArmed: boolean; online: boolean };
 
 export default function DevicesView() {
   const [devices, setDevices] = useState<DeviceWithState[] | null>(null);

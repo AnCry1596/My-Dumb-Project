@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DeviceDoc, ScheduleRule } from "@/lib/mongodb";
 
-type DeviceWithState = DeviceDoc & { currentlyArmed: boolean };
+type DeviceWithState = DeviceDoc & { currentlyArmed: boolean; online: boolean };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -104,8 +104,19 @@ export default function DeviceCard({
           <>
             <div className="flex flex-col">
               <span className="font-medium text-black dark:text-zinc-50">{device.name}</span>
-              <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {device.deviceId || "Waiting for device to pair..."}
+              <span className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+                {device.deviceId ? (
+                  <>
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${
+                        device.online ? "bg-green-500" : "bg-zinc-400"
+                      }`}
+                    />
+                    {device.deviceId} · {device.online ? "Online" : "Offline"}
+                  </>
+                ) : (
+                  "Waiting for device to pair..."
+                )}
               </span>
             </div>
             <button onClick={() => setEditingName(device.name)} className="text-sm underline">

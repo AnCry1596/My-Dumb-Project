@@ -70,6 +70,16 @@ export interface DeviceDoc {
   scheduleRules: ScheduleRule[]; // recurring weekly disarm windows
   tempOverrideUntil?: string; // ISO time; while now < this, tempOverrideArmed wins over schedule/manual
   tempOverrideArmed?: boolean;
+  lastSeenAt?: string; // ISO time, bumped on every /api/devices/state poll from the device
+}
+
+// Device polls /api/devices/state every STATE_POLL_MS (5s in firmware); missing a
+// couple of cycles before calling it offline avoids flapping on one dropped request.
+export const ONLINE_THRESHOLD_MS = 15_000;
+
+export function isDeviceOnline(device: DeviceDoc, now: Date = new Date()): boolean {
+  if (!device.lastSeenAt) return false;
+  return now.getTime() - new Date(device.lastSeenAt).getTime() < ONLINE_THRESHOLD_MS;
 }
 
 // Resolves whether a device should currently be armed, in priority order:
@@ -106,6 +116,13 @@ export async function getDevicesForOwner(ownerId: string): Promise<DeviceDoc[]> 
     .sort({ createdAt: -1 })
     .toArray();
   return JSON.parse(JSON.stringify(docs));
+}
+
+export async function markDeviceSeen(deviceId: string) {
+  const db = await getDb();
+  await db
+    .collection<DeviceDoc>("devices")
+    .updateOne({ deviceId }, { $set: { lastSeenAt: new Date().toISOString() } });
 }
 
 export async function getDeviceByDeviceId(deviceId: string) {

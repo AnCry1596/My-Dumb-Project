@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDeviceByDeviceId, verifyDeviceToken, computeArmedState } from "@/lib/mongodb";
+import { getDeviceByDeviceId, verifyDeviceToken, computeArmedState, markDeviceSeen } from "@/lib/mongodb";
 
 // Polled by the ESP32 every few seconds instead of listening on MQTT. Returns the
 // device's current armed/disarmed state (already resolved from manual flag, one-off
@@ -15,6 +15,8 @@ export async function GET(request: Request) {
 
   const device = await getDeviceByDeviceId(deviceId);
   if (!device) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  await markDeviceSeen(deviceId);
 
   return NextResponse.json({
     armed: computeArmedState(device),
