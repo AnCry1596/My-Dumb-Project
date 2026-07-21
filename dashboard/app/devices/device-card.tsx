@@ -54,6 +54,14 @@ export default function DeviceCard({
     onChanged();
   }
 
+  async function removeDevice() {
+    if (!confirm(`Remove "${device.name}"? This can't be undone.`)) return;
+    setBusy(true);
+    await fetch(`/api/devices/${id}`, { method: "DELETE" });
+    setBusy(false);
+    onChanged();
+  }
+
   async function saveSchedule() {
     setBusy(true);
     await patchDevice(id, {
@@ -119,9 +127,14 @@ export default function DeviceCard({
                 )}
               </span>
             </div>
-            <button onClick={() => setEditingName(device.name)} className="text-sm underline">
-              Rename
-            </button>
+            <div className="flex gap-3">
+              <button onClick={() => setEditingName(device.name)} className="text-sm underline">
+                Rename
+              </button>
+              <button onClick={removeDevice} disabled={busy} className="text-sm text-red-600 underline disabled:opacity-50 dark:text-red-400">
+                Remove
+              </button>
+            </div>
           </>
         )}
       </div>

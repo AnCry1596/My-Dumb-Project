@@ -25,6 +25,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid or expired pairing code" }, { status: 404 });
   }
 
+  // Same physical chip paired before (e.g. re-run through setup against a new
+  // pairing code) leaves its old device doc behind with this same deviceId — without
+  // clearing it out, two docs share one deviceId and findOne({deviceId}) elsewhere
+  // (state polls, token auth) can non-deterministically pick the stale one, causing
+  // 401s on an otherwise-valid device. This claim is the newer one, so it wins.
+  await devices.deleteOne({ deviceId, _id: { $ne: pending._id } });
+
   await devices.updateOne(
     { _id: pending._id },
     { $set: { deviceId, token }, $unset: { claimCode: "" } }

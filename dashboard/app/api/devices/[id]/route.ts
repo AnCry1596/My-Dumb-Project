@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import {
   renameDevice,
+  deleteDevice,
   setDeviceArmed,
   setDeviceOverride,
   clearDeviceOverride,
@@ -36,6 +37,17 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/devices/[i
   } else {
     return NextResponse.json({ error: "no recognized fields in request body" }, { status: 400 });
   }
+
+  if (!ok) return NextResponse.json({ error: "device not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}
+
+export async function DELETE(request: Request, ctx: RouteContext<"/api/devices/[id]">) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const { id } = await ctx.params;
+  const ok = await deleteDevice(session.user.id, id);
 
   if (!ok) return NextResponse.json({ error: "device not found" }, { status: 404 });
   return NextResponse.json({ ok: true });

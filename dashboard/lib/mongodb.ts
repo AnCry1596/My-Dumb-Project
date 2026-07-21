@@ -196,6 +196,14 @@ export async function renameDevice(ownerId: string, deviceObjectId: string, name
   return result.matchedCount > 0;
 }
 
+export async function deleteDevice(ownerId: string, deviceObjectId: string) {
+  const db = await getDb();
+  const result = await db
+    .collection<DeviceDoc>("devices")
+    .deleteOne({ _id: new ObjectId(deviceObjectId), ownerId });
+  return result.deletedCount > 0;
+}
+
 export async function setDeviceArmed(ownerId: string, deviceObjectId: string, armed: boolean) {
   const db = await getDb();
   const result = await db.collection<DeviceDoc>("devices").updateOne(
