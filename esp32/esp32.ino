@@ -1,6 +1,6 @@
-// SmartDoor ESP32 firmware — polls the Next.js dashboard for armed/disarmed state
+// SmartDoor ESP32 firmware — polls the Next.js dashboard for alarmed/disalarmed state
 // and posts every door event to it. No MQTT: all control now lives on the server
-// (manual arm/disarm, one-off "disarm until", recurring weekly schedule).
+// (manual alarm/disalarm, one-off "disalarm until", recurring weekly schedule).
 //
 // Libraries needed (Arduino IDE > Tools > Manage Libraries):
 //   "WiFiManager" by tzapu
@@ -28,11 +28,11 @@
 // later, hold BOOT (GPIO0) during power-on for 3s, or clear WiFi settings via
 // WiFiManager's portal.
 //
-// Armed state comes from the dashboard, polled every STATE_POLL_MS. While disarmed
+// Alarmed state comes from the dashboard, polled every STATE_POLL_MS. While disalarmed
 // (by manual toggle, one-off override, or recurring schedule), the door sensor still
 // reports every open/close to the dashboard as usual — the server decides whether
 // that's alarm-worthy based on its own schedule, and only the local buzzer/LED are
-// silenced here. Nothing about logging changes based on armed state.
+// silenced here. Nothing about logging changes based on alarmed state.
 
 #define USE_LCD 0
 
@@ -53,7 +53,7 @@ const int LOCK_LED_PIN = 2;   // ponytail: onboard LED stands in for real lock, 
 const int HALL_PIN     = 4;   // A3144 OUT, open-collector, LOW = magnet present = door closed
 const int BUZZER_PIN   = 15;  // active buzzer, HIGH = on
 const int SETUP_BUTTON_PIN = 0; // BOOT button on most ESP32 dev boards
-const unsigned long STATE_POLL_MS = 5000; // how often to ask the dashboard for armed/disarmed state
+const unsigned long STATE_POLL_MS = 5000; // how often to ask the dashboard for alarmed/disalarmed state
 
 // ponytail: locked to the local dev server for testing — switch to your public https:// URL once hosted
 // const char* DEFAULT_DASHBOARD_URL = "http://192.168.79.2:3000";
@@ -95,7 +95,7 @@ bool beginDashboardRequest(HTTPClient& http, const String& path) {
 LiquidCrystal lcd(13, 12, 14, 27, 26, 25); // RS, E, D4, D5, D6, D7
 #endif
 
-bool armed = true;        // last known state from the dashboard
+bool alarmed = true;      // last known state from the dashboard
 bool lastDoorOpen = false;
 unsigned long lastStatePoll = 0;
 
@@ -119,7 +119,7 @@ void showLine2(const char* text) {
 
 // Fire-and-forget: logs one event via the dashboard's API, does not block the door logic on failure.
 // Always sends alarm:false — the server independently recomputes whether this is alarm-worthy
-// from its own schedule/override state, which is the authority, not this device's local `armed` copy.
+// from its own schedule/override state, which is the authority, not this device's local `alarmed` copy.
 void logToMongo(const char* event) {
   if (WiFi.status() != WL_CONNECTED || dashboardUrl.isEmpty()) return;
 
@@ -136,7 +136,7 @@ void logToMongo(const char* event) {
   http.end();
 }
 
-// Polls the dashboard for current armed/disarmed state. Called on a timer from loop()
+// Polls the dashboard for current alarmed/disalarmed state. Called on a timer from loop()
 // so schedule/override/manual-toggle changes made on the dashboard reach the device
 // within STATE_POLL_MS, without needing MQTT or any inbound connection to the device.
 void pollState() {
@@ -149,8 +149,8 @@ void pollState() {
   if (code == 200) {
     JsonDocument doc;
     if (deserializeJson(doc, http.getString()) == DeserializationError::Ok) {
-      armed = doc["armed"] | true;
-      showLine2(armed ? "System: ARMED" : "System: disarmed");
+      alarmed = doc["alarmed"] | true;
+      showLine2(alarmed ? "System: ALARMED" : "System: disalarmed");
     }
   } else {
     Serial.println("State poll -> HTTP " + String(code));
@@ -332,9 +332,9 @@ void loop() {
 
   // Drive the buzzer off the sensor immediately — before any network call — so it
   // reacts instantly even if the dashboard is unreachable. Buzzer only sounds while
-  // armed; while disarmed (manual/schedule/override) the door is still logged below,
+  // alarmed; while disalarmed (manual/schedule/override) the door is still logged below,
   // just silently.
-  digitalWrite(BUZZER_PIN, (doorOpen && armed) ? HIGH : LOW);
+  digitalWrite(BUZZER_PIN, (doorOpen && alarmed) ? HIGH : LOW);
 
   if (doorOpen != lastDoorOpen) {
     lastDoorOpen = doorOpen;

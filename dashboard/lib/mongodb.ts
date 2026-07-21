@@ -65,11 +65,11 @@ export interface DeviceDoc {
   claimCode?: string; // pending pairing code, cleared once claimed
   token?: string; // per-device secret the ESP32 generates itself, set once at claim time
   createdAt: string;
-  armed: boolean; // manual base state, used when no schedule/override applies
+  alarmed: boolean; // manual base state, used when no schedule/override applies
   timezoneOffsetMinutes: number; // minutes east of UTC, for evaluating scheduleRules
-  scheduleRules: ScheduleRule[]; // recurring weekly disarm windows
-  tempOverrideUntil?: string; // ISO time; while now < this, tempOverrideArmed wins over schedule/manual
-  tempOverrideArmed?: boolean;
+  scheduleRules: ScheduleRule[]; // recurring weekly disalarm windows
+  tempOverrideUntil?: string; // ISO time; while now < this, tempOverrideAlarmed wins over schedule/manual
+  tempOverrideAlarmed?: boolean;
   lastSeenAt?: string; // ISO time, bumped on every /api/devices/state poll from the device
   offlineNotifiedAt?: string; // set once the "went offline" push fires, so the cron doesn't repeat it every run; cleared on reconnect
 }
@@ -83,13 +83,13 @@ export function isDeviceOnline(device: DeviceDoc, now: Date = new Date()): boole
   return now.getTime() - new Date(device.lastSeenAt).getTime() < ONLINE_THRESHOLD_MS;
 }
 
-// Resolves whether a device should currently be armed, in priority order:
-// 1. An active one-off override ("disarm until 6pm") — wins until it expires
-// 2. A matching recurring weekly schedule rule — always disarms during its window
-// 3. The manual base `armed` flag
-export function computeArmedState(device: DeviceDoc, now: Date = new Date()): boolean {
+// Resolves whether a device should currently be alarmed, in priority order:
+// 1. An active one-off override ("disalarm until 6pm") — wins until it expires
+// 2. A matching recurring weekly schedule rule — always disalarms during its window
+// 3. The manual base `alarmed` flag
+export function computeAlarmedState(device: DeviceDoc, now: Date = new Date()): boolean {
   if (device.tempOverrideUntil && new Date(device.tempOverrideUntil) > now) {
-    return device.tempOverrideArmed ?? device.armed;
+    return device.tempOverrideAlarmed ?? device.alarmed;
   }
 
   const offsetMs = (device.timezoneOffsetMinutes ?? 0) * 60_000;
@@ -103,10 +103,10 @@ export function computeArmedState(device: DeviceDoc, now: Date = new Date()): bo
     const [eh, em] = rule.end.split(":").map(Number);
     const startMin = sh * 60 + sm;
     const endMin = eh * 60 + em;
-    if (minutesNow >= startMin && minutesNow < endMin) return false; // disarmed during this window
+    if (minutesNow >= startMin && minutesNow < endMin) return false; // disalarmed during this window
   }
 
-  return device.armed;
+  return device.alarmed;
 }
 
 export async function getDevicesForOwner(ownerId: string): Promise<DeviceDoc[]> {
@@ -180,7 +180,7 @@ export async function createPendingDevice(ownerId: string, claimCode: string, na
     claimCode,
     name,
     createdAt: new Date().toISOString(),
-    armed: true,
+    alarmed: true,
     timezoneOffsetMinutes: 0,
     scheduleRules: [],
   });
@@ -204,11 +204,11 @@ export async function deleteDevice(ownerId: string, deviceObjectId: string) {
   return result.deletedCount > 0;
 }
 
-export async function setDeviceArmed(ownerId: string, deviceObjectId: string, armed: boolean) {
+export async function setDeviceAlarmed(ownerId: string, deviceObjectId: string, alarmed: boolean) {
   const db = await getDb();
   const result = await db.collection<DeviceDoc>("devices").updateOne(
     { _id: new ObjectId(deviceObjectId), ownerId },
-    { $set: { armed }, $unset: { tempOverrideUntil: "", tempOverrideArmed: "" } }
+    { $set: { alarmed }, $unset: { tempOverrideUntil: "", tempOverrideAlarmed: "" } }
   );
   return result.matchedCount > 0;
 }
@@ -216,13 +216,13 @@ export async function setDeviceArmed(ownerId: string, deviceObjectId: string, ar
 export async function setDeviceOverride(
   ownerId: string,
   deviceObjectId: string,
-  armed: boolean,
+  alarmed: boolean,
   until: string
 ) {
   const db = await getDb();
   const result = await db.collection<DeviceDoc>("devices").updateOne(
     { _id: new ObjectId(deviceObjectId), ownerId },
-    { $set: { tempOverrideArmed: armed, tempOverrideUntil: until } }
+    { $set: { tempOverrideAlarmed: alarmed, tempOverrideUntil: until } }
   );
   return result.matchedCount > 0;
 }
@@ -231,7 +231,7 @@ export async function clearDeviceOverride(ownerId: string, deviceObjectId: strin
   const db = await getDb();
   const result = await db.collection<DeviceDoc>("devices").updateOne(
     { _id: new ObjectId(deviceObjectId), ownerId },
-    { $unset: { tempOverrideUntil: "", tempOverrideArmed: "" } }
+    { $unset: { tempOverrideUntil: "", tempOverrideAlarmed: "" } }
   );
   return result.matchedCount > 0;
 }

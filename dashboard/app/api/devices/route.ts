@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
-import { getDevicesForOwner, createPendingDevice, computeArmedState, isDeviceOnline } from "@/lib/mongodb";
+import { getDevicesForOwner, createPendingDevice, computeAlarmedState, isDeviceOnline } from "@/lib/mongodb";
 import { randomInt } from "crypto";
 
 function generateClaimCode() {
@@ -15,7 +15,7 @@ export async function GET() {
   const devices = await getDevicesForOwner(session.user.id);
   const withResolvedState = devices.map((d) => ({
     ...d,
-    currentlyArmed: computeArmedState(d),
+    currentlyAlarmed: computeAlarmedState(d),
     online: isDeviceOnline(d),
   }));
   return NextResponse.json(withResolvedState);

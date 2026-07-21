@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import {
   getDeviceByDeviceId,
   verifyDeviceToken,
-  computeArmedState,
+  computeAlarmedState,
   markDeviceSeen,
   isDeviceOnline,
 } from "@/lib/mongodb";
 import { notifyOwner } from "@/lib/push";
 
 // Polled by the ESP32 every few seconds instead of listening on MQTT. Returns the
-// device's current armed/disarmed state (already resolved from manual flag, one-off
+// device's current alarmed/disalarmed state (already resolved from manual flag, one-off
 // override, and recurring schedule) plus server time, since the ESP32 has no RTC of
 // its own and only gets wall-clock time via NTP at boot.
 export async function GET(request: Request) {
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    armed: computeArmedState(device),
+    alarmed: computeAlarmedState(device),
     serverTime: new Date().toISOString(),
   });
 }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { DeviceDoc, ScheduleRule } from "@/lib/mongodb";
 
-type DeviceWithState = DeviceDoc & { currentlyArmed: boolean; online: boolean };
+type DeviceWithState = DeviceDoc & { currentlyAlarmed: boolean; online: boolean };
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -36,17 +36,17 @@ export default function DeviceCard({
 
   const hasOverride = device.tempOverrideUntil && new Date(device.tempOverrideUntil) > new Date();
 
-  async function toggleArmed() {
+  async function toggleAlarmed() {
     setBusy(true);
-    await patchDevice(id, { armed: !device.armed });
+    await patchDevice(id, { alarmed: !device.alarmed });
     setBusy(false);
     onChanged();
   }
 
-  async function disarmFor(minutes: number) {
+  async function disalarmFor(minutes: number) {
     setBusy(true);
     const until = new Date(Date.now() + minutes * 60_000).toISOString();
-    await patchDevice(id, { overrideArmed: false, overrideUntil: until });
+    await patchDevice(id, { overrideAlarmed: false, overrideUntil: until });
     setBusy(false);
     onChanged();
   }
@@ -158,30 +158,30 @@ export default function DeviceCard({
             <div className="flex items-center gap-2">
               <span
                 className={`inline-block h-2 w-2 rounded-full ${
-                  device.currentlyArmed ? "bg-red-500" : "bg-zinc-400"
+                  device.currentlyAlarmed ? "bg-red-500" : "bg-zinc-400"
                 }`}
               />
               <span className="text-xs text-zinc-500 dark:text-zinc-400">
-                {device.currentlyArmed ? "Armed" : "Disarmed"}
+                {device.currentlyAlarmed ? "Alarmed" : "Disalarmed"}
                 {hasOverride &&
                   ` until ${new Date(device.tempOverrideUntil!).toLocaleTimeString()}`}
               </span>
             </div>
             <button
-              onClick={toggleArmed}
+              onClick={toggleAlarmed}
               disabled={busy}
               className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white disabled:opacity-50 dark:bg-white dark:text-black"
             >
-              {device.armed ? "Disarm" : "Arm"} (base state)
+              {device.alarmed ? "Disalarm" : "Alarm"} (base state)
             </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <span className="text-zinc-500 dark:text-zinc-400">Quick disarm:</span>
+            <span className="text-zinc-500 dark:text-zinc-400">Quick disalarm:</span>
             {[30, 60, 240].map((m) => (
               <button
                 key={m}
-                onClick={() => disarmFor(m)}
+                onClick={() => disalarmFor(m)}
                 disabled={busy}
                 className="rounded border border-zinc-300 px-2 py-1 disabled:opacity-50 dark:border-zinc-700"
               >
@@ -196,7 +196,7 @@ export default function DeviceCard({
               className="w-16 rounded border border-zinc-300 px-1 py-1 dark:border-zinc-700 dark:bg-zinc-950"
             />
             <button
-              onClick={() => disarmFor(overrideMinutes)}
+              onClick={() => disalarmFor(overrideMinutes)}
               disabled={busy}
               className="rounded border border-zinc-300 px-2 py-1 disabled:opacity-50 dark:border-zinc-700"
             >
@@ -220,7 +220,7 @@ export default function DeviceCard({
           {showSchedule && (
             <div className="flex flex-col gap-2 border-t border-zinc-100 pt-3 dark:border-zinc-800">
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Device disarms automatically during these recurring windows (your local time).
+                Device disalarms automatically during these recurring windows (your local time).
               </p>
               {rules.map((rule, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">

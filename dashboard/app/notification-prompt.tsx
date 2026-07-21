@@ -64,7 +64,7 @@ export default function NotificationPrompt() {
       <span>
         {status === "denied"
           ? "Notifications are blocked in your browser settings — enable them to get alarm alerts."
-          : "Turn on notifications to get alerted when a door opens while the system is armed."}
+          : "Turn on notifications to get alerted when a door opens while the system is alarmed."}
       </span>
       {status === "available" && (
         <button onClick={subscribe} className="rounded bg-black px-3 py-1.5 text-xs font-medium text-white dark:bg-white dark:text-black">

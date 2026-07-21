@@ -9,8 +9,8 @@ const EVENT_LABEL: Record<string, string> = {
   DOOR_CLOSE: "Door closed",
   LOCK_OPEN: "Lock unlocked (remote)",
   LOCK_CLOSE: "Lock locked (remote)",
-  SYSTEM_ON: "System armed",
-  SYSTEM_OFF: "System disarmed",
+  SYSTEM_ON: "System alarmed",
+  SYSTEM_OFF: "System disalarmed",
 };
 
 const PAGE_SIZE = 25;

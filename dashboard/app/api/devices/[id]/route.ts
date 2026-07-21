@@ -3,7 +3,7 @@ import { auth } from "@/auth";
 import {
   renameDevice,
   deleteDevice,
-  setDeviceArmed,
+  setDeviceAlarmed,
   setDeviceOverride,
   clearDeviceOverride,
   setDeviceSchedule,
@@ -24,12 +24,12 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/devices/[i
 
   if (typeof body.name === "string" && body.name.trim()) {
     ok = await renameDevice(ownerId, id, body.name.trim());
-  } else if (typeof body.armed === "boolean") {
-    ok = await setDeviceArmed(ownerId, id, body.armed);
+  } else if (typeof body.alarmed === "boolean") {
+    ok = await setDeviceAlarmed(ownerId, id, body.alarmed);
   } else if (body.clearOverride === true) {
     ok = await clearDeviceOverride(ownerId, id);
-  } else if (typeof body.overrideArmed === "boolean" && typeof body.overrideUntil === "string") {
-    ok = await setDeviceOverride(ownerId, id, body.overrideArmed, body.overrideUntil);
+  } else if (typeof body.overrideAlarmed === "boolean" && typeof body.overrideUntil === "string") {
+    ok = await setDeviceOverride(ownerId, id, body.overrideAlarmed, body.overrideUntil);
   } else if (Array.isArray(body.scheduleRules)) {
     const rules = body.scheduleRules as ScheduleRule[];
     const tz = typeof body.timezoneOffsetMinutes === "number" ? body.timezoneOffsetMinutes : 0;
