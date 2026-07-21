@@ -20,16 +20,6 @@ export default function DevicesView() {
       const data: DeviceWithState[] = await res.json();
       setDevices(data);
       setError(null);
-
-      // Once the device we're waiting on actually pairs (gets a deviceId), the
-      // pairing-code banner has served its purpose — hide it.
-      if (pendingDeviceObjectId) {
-        const paired = data.find((d) => String(d._id) === pendingDeviceObjectId)?.deviceId;
-        if (paired) {
-          setPendingCode(null);
-          setPendingDeviceObjectId(null);
-        }
-      }
     } catch (e) {
       setError((e as Error).message);
     }
@@ -40,6 +30,19 @@ export default function DevicesView() {
     const id = setInterval(load, 3000); // ponytail: poll instead of websockets, catches pairing + schedule-driven state changes
     return () => clearInterval(id);
   }, []);
+
+  // Once the device we're waiting on actually pairs (gets a deviceId), the
+  // pairing-code banner has served its purpose — hide it. Runs whenever a poll
+  // brings in fresh `devices`, instead of living inside the interval's `load`
+  // closure (which would keep seeing pendingDeviceObjectId as it was at mount).
+  useEffect(() => {
+    if (!pendingDeviceObjectId || !devices) return;
+    const paired = devices.find((d) => String(d._id) === pendingDeviceObjectId)?.deviceId;
+    if (paired) {
+      setPendingCode(null);
+      setPendingDeviceObjectId(null);
+    }
+  }, [devices, pendingDeviceObjectId]);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
