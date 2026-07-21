@@ -9,26 +9,38 @@ if (publicKey && privateKey && subject) {
   webpush.setVapidDetails(subject, publicKey, privateKey);
 }
 
+const RETRY_DELAYS_MS = [500, 2000]; // ponytail: fixed backoff, good enough for a push service blip
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function sendWithRetry(sub: { endpoint: string; keys: { p256dh: string; auth: string } }, body: string) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await webpush.sendNotification({ endpoint: sub.endpoint, keys: sub.keys }, body);
+      return;
+    } catch (err) {
+      const statusCode = (err as { statusCode?: number }).statusCode;
+      if (statusCode === 404 || statusCode === 410) {
+        // subscription expired or was revoked by the browser — stop trying it
+        await removePushSubscription(sub.endpoint);
+        return;
+      }
+      if (statusCode !== undefined && statusCode < 500) return; // bad request/payload, retrying won't help
+      if (attempt >= RETRY_DELAYS_MS.length) {
+        console.error("Push send failed after retries:", err);
+        return;
+      }
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+}
+
 export async function notifyOwner(ownerId: string, payload: { title: string; body: string }) {
   if (!publicKey || !privateKey) return; // push not configured, skip silently
 
   const subs = await getPushSubscriptionsForOwner(ownerId);
-  await Promise.all(
-    subs.map(async (sub) => {
-      try {
-        await webpush.sendNotification(
-          { endpoint: sub.endpoint, keys: sub.keys },
-          JSON.stringify(payload)
-        );
-      } catch (err) {
-        const statusCode = (err as { statusCode?: number }).statusCode;
-        if (statusCode === 404 || statusCode === 410) {
-          // subscription expired or was revoked by the browser — stop trying it
-          await removePushSubscription(sub.endpoint);
-        } else {
-          console.error("Push send failed:", err);
-        }
-      }
-    })
-  );
+  const body = JSON.stringify(payload);
+  await Promise.all(subs.map((sub) => sendWithRetry(sub, body)));
 }

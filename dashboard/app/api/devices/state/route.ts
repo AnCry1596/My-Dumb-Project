@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { getDeviceByDeviceId, verifyDeviceToken, computeArmedState, markDeviceSeen } from "@/lib/mongodb";
+import {
+  getDeviceByDeviceId,
+  verifyDeviceToken,
+  computeArmedState,
+  markDeviceSeen,
+  isDeviceOnline,
+} from "@/lib/mongodb";
+import { notifyOwner } from "@/lib/push";
 
 // Polled by the ESP32 every few seconds instead of listening on MQTT. Returns the
 // device's current armed/disarmed state (already resolved from manual flag, one-off
@@ -16,7 +23,19 @@ export async function GET(request: Request) {
   const device = await getDeviceByDeviceId(deviceId);
   if (!device) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+  // There's no cron here — offline is only ever noticed retroactively, on whatever
+  // poll finally lands after a gap. Read the *previous* lastSeenAt before overwriting
+  // it: if the device was already considered offline, this poll is a reconnect.
+  const wasOffline = !isDeviceOnline(device);
   await markDeviceSeen(deviceId);
+
+  if (wasOffline && device.lastSeenAt) {
+    const offlineMinutes = Math.round((Date.now() - new Date(device.lastSeenAt).getTime()) / 60_000);
+    await notifyOwner(device.ownerId, {
+      title: `${device.name} back online`,
+      body: offlineMinutes >= 1 ? `Was offline for ~${offlineMinutes}m.` : "Reconnected.",
+    });
+  }
 
   return NextResponse.json({
     armed: computeArmedState(device),

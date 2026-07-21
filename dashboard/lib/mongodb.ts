@@ -71,11 +71,12 @@ export interface DeviceDoc {
   tempOverrideUntil?: string; // ISO time; while now < this, tempOverrideArmed wins over schedule/manual
   tempOverrideArmed?: boolean;
   lastSeenAt?: string; // ISO time, bumped on every /api/devices/state poll from the device
+  offlineNotifiedAt?: string; // set once the "went offline" push fires, so the cron doesn't repeat it every run; cleared on reconnect
 }
 
 // Device polls /api/devices/state every STATE_POLL_MS (5s in firmware); missing a
 // couple of cycles before calling it offline avoids flapping on one dropped request.
-export const ONLINE_THRESHOLD_MS = 15_000;
+export const ONLINE_THRESHOLD_MS = Number(process.env.ONLINE_THRESHOLD_MS) || 15_000;
 
 export function isDeviceOnline(device: DeviceDoc, now: Date = new Date()): boolean {
   if (!device.lastSeenAt) return false;
@@ -122,7 +123,34 @@ export async function markDeviceSeen(deviceId: string) {
   const db = await getDb();
   await db
     .collection<DeviceDoc>("devices")
-    .updateOne({ deviceId }, { $set: { lastSeenAt: new Date().toISOString() } });
+    .updateOne(
+      { deviceId },
+      { $set: { lastSeenAt: new Date().toISOString() }, $unset: { offlineNotifiedAt: "" } }
+    );
+}
+
+// Paired devices that have gone quiet (past ONLINE_THRESHOLD_MS since their last poll)
+// and haven't already been flagged — used by the offline-check cron so it notifies
+// once per outage instead of every run.
+export async function getNewlyOfflineDevices(): Promise<DeviceDoc[]> {
+  const db = await getDb();
+  const cutoff = new Date(Date.now() - ONLINE_THRESHOLD_MS).toISOString();
+  const docs = await db
+    .collection<DeviceDoc>("devices")
+    .find({
+      deviceId: { $ne: "" },
+      lastSeenAt: { $exists: true, $lt: cutoff },
+      offlineNotifiedAt: { $exists: false },
+    })
+    .toArray();
+  return JSON.parse(JSON.stringify(docs));
+}
+
+export async function markDeviceOfflineNotified(deviceId: string) {
+  const db = await getDb();
+  await db
+    .collection<DeviceDoc>("devices")
+    .updateOne({ deviceId }, { $set: { offlineNotifiedAt: new Date().toISOString() } });
 }
 
 export async function getDeviceByDeviceId(deviceId: string) {
