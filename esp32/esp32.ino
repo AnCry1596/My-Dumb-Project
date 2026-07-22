@@ -34,7 +34,7 @@
 // that's alarm-worthy based on its own schedule, and only the local buzzer/LED are
 // silenced here. Nothing about logging changes based on alarmed state.
 
-#define USE_LCD 0
+#define USE_LCD 1
 
 #include <WiFi.h>
 #include <WiFiClient.h>
@@ -218,9 +218,9 @@ void runSetupPortal() {
 #if USE_LCD
   lcd.clear();
   lcd.setCursor(0, 0);
-  lcd.print("Setup mode:");
+  lcd.print("Setup wifi:");
   lcd.setCursor(0, 1);
-  lcd.print("WiFi SmartDoor-Setup");
+  lcd.print("SmartDoor-Setup");
 #endif
 
   if (!wm.autoConnect("SmartDoor-Setup")) {
