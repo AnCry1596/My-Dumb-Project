@@ -93,11 +93,19 @@ bool beginDashboardRequest(HTTPClient& http, const String& path) {
 }
 #if USE_LCD
 LiquidCrystal lcd(13, 12, 14, 27, 26, 25); // RS, E, D4, D5, D6, D7
+
+// Custom 5x8 glyphs, slots 0-3 (LiquidCrystal supports up to 8). Drawn with lcd.write(n).
+byte ICON_DOOR_OPEN[8]   = {0b01110, 0b10001, 0b10001, 0b10000, 0b10000, 0b10001, 0b01110, 0b00000};
+byte ICON_DOOR_CLOSED[8] = {0b01110, 0b10001, 0b10001, 0b10001, 0b10001, 0b10001, 0b01110, 0b00000};
+byte ICON_BELL[8]        = {0b00100, 0b01110, 0b01110, 0b01110, 0b11111, 0b00000, 0b00100, 0b00000};
+byte ICON_WIFI[8]        = {0b00000, 0b01110, 0b10001, 0b00100, 0b01010, 0b00000, 0b00100, 0b00000};
 #endif
 
 bool alarmed = true;      // last known state from the dashboard
 bool lastDoorOpen = false;
 unsigned long lastStatePoll = 0;
+unsigned long lastRow1Cycle = 0;
+bool row1ShowingWifi = false; // row 1 alternates between door state and WiFi signal/IP
 
 String isoTimestamp() {
   time_t now = time(nullptr);
@@ -108,12 +116,45 @@ String isoTimestamp() {
   return String(buf);
 }
 
-void showLine2(const char* text) {
-  Serial.println(text);
+void showLcdLine(int row, const char* text) {
 #if USE_LCD
-  lcd.setCursor(0, 1);
+  lcd.setCursor(0, row);
   lcd.print(text);
   for (int i = strlen(text); i < 16; i++) lcd.print(' '); // pad to clear leftovers
+#endif
+}
+
+void showLine2(const char* text) {
+  Serial.println(text);
+  showLcdLine(1, text);
+}
+
+// Blocking scroll, only used in the setup portal (nothing else is competing for the LCD then).
+// Pads with 3 trailing spaces as a gap before it loops back to the start.
+void scrollLine(int row, const String& text, int cycles, int stepDelayMs) {
+#if USE_LCD
+  String padded = text + "   ";
+  int len = padded.length();
+  for (int c = 0; c < cycles; c++) {
+    for (int i = 0; i < len; i++) {
+      String window;
+      for (int k = 0; k < 16; k++) window += padded[(i + k) % len];
+      lcd.setCursor(0, row);
+      lcd.print(window);
+      delay(stepDelayMs);
+    }
+  }
+#endif
+}
+
+void showWifiRow(int row) {
+#if USE_LCD
+  lcd.setCursor(0, row);
+  lcd.write((uint8_t)3); // wifi icon, slot 3
+  String line = String(WiFi.RSSI()) + "dBm " + WiFi.localIP().toString();
+  if (line.length() > 15) line = line.substring(0, 15);
+  lcd.print(line);
+  for (int i = line.length(); i < 15; i++) lcd.print(' ');
 #endif
 }
 
@@ -150,7 +191,14 @@ void pollState() {
     JsonDocument doc;
     if (deserializeJson(doc, http.getString()) == DeserializationError::Ok) {
       alarmed = doc["alarmed"] | true;
-      showLine2(alarmed ? "System: ALARMED" : "System: disalarmed");
+      Serial.println(alarmed ? "Alarm: ON" : "Alarm: OFF");
+#if USE_LCD
+      lcd.setCursor(0, 1);
+      lcd.write((uint8_t)2);
+      String text = alarmed ? " Alarm: ON" : " Alarm: OFF";
+      lcd.print(text);
+      for (int i = text.length() + 1; i < 16; i++) lcd.print(' ');
+#endif
     }
   } else {
     Serial.println("State poll -> HTTP " + String(code));
@@ -158,12 +206,19 @@ void pollState() {
   http.end();
 }
 
-void publishStatus(bool isOpen) {
-  Serial.println(isOpen ? "Door: OPEN" : "Door: CLOSED");
+void showDoorRow(bool isOpen) {
 #if USE_LCD
   lcd.setCursor(0, 0);
-  lcd.print(isOpen ? "Door: OPEN    " : "Door: CLOSED  ");
+  lcd.write((uint8_t)(isOpen ? 0 : 1));
+  String text = isOpen ? " Door: OPEN" : " Door: CLOSED";
+  lcd.print(text);
+  for (int i = text.length() + 1; i < 16; i++) lcd.print(' ');
 #endif
+}
+
+void publishStatus(bool isOpen) {
+  Serial.println(isOpen ? "Door: OPEN" : "Door: CLOSED");
+  if (!row1ShowingWifi) showDoorRow(isOpen);
   logToMongo(isOpen ? "DOOR_OPEN" : "DOOR_CLOSE");
 }
 
@@ -219,6 +274,7 @@ void runSetupPortal() {
   lcd.clear();
   lcd.setCursor(0, 0);
   lcd.print("Setup wifi:");
+  scrollLine(1, "Join SmartDoor-Setup, no password", 2, 300);
   lcd.setCursor(0, 1);
   lcd.print("SmartDoor-Setup");
 #endif
@@ -265,6 +321,10 @@ void setup() {
 
 #if USE_LCD
   lcd.begin(16, 2);
+  lcd.createChar(0, ICON_DOOR_OPEN);
+  lcd.createChar(1, ICON_DOOR_CLOSED);
+  lcd.createChar(2, ICON_BELL);
+  lcd.createChar(3, ICON_WIFI);
   lcd.setCursor(0, 0);
   lcd.print("Starting...");
 #endif
@@ -327,6 +387,16 @@ void loop() {
     lastStatePoll = millis();
     pollState();
   }
+
+#if USE_LCD
+  // Row 1 alternates between door state and WiFi signal/IP every 4s; row 2 (alarm) is untouched.
+  if (millis() - lastRow1Cycle > 4000) {
+    lastRow1Cycle = millis();
+    row1ShowingWifi = !row1ShowingWifi;
+    if (row1ShowingWifi) showWifiRow(0);
+    else showDoorRow(lastDoorOpen);
+  }
+#endif
 
   bool doorOpen = digitalRead(HALL_PIN) == HIGH; // no magnet nearby = door open
 
