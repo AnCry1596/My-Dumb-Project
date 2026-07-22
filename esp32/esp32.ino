@@ -266,7 +266,7 @@ void setup() {
 #if USE_LCD
   lcd.begin(16, 2);
   lcd.setCursor(0, 0);
-  lcd.print("Connecting...");
+  lcd.print("Starting...");
 #endif
 
   prefs.begin("smartdoor", false);
